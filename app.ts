@@ -3,10 +3,11 @@ import cors from "cors";
 import { router as index } from "./controller/index";
 import { router as trip } from "./controller/trip";
 import { router as ping } from "./controller/ping";
+import { router as upload } from "./controller/upload";
+import bodyParser from "body-parser";
 
 export const app = express();
 
-app.use(express.json()); 
 app.use(
     cors({
         origin: "*",
@@ -15,6 +16,12 @@ app.use(
     })
 );
 
+
+
+app.use(bodyParser.text());
+app.use(bodyParser.json());
 app.use("/", index);
 app.use("/trip", trip);
-app.use("/ping", ping)
+app.use("/ping", ping);
+app.use("/upload", upload);
+app.use("/uploads", express.static("uploads"));

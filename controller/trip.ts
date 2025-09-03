@@ -2,14 +2,14 @@ import express, { Request, Response } from "express";
 import db from "../db/dbconnect";
 
 export interface Trip {
-    idx:           number;
-    name:          string;
-    country:       string;
+    idx: number;
+    name: string;
+    country: string;
     destinationid: number;
-    coverimage:    string;
-    detail:        string;
-    price:         number;
-    duration:      number;
+    coverimage: string;
+    detail: string;
+    price: number;
+    duration: number;
 }
 
 export const router = express.Router();
@@ -40,19 +40,21 @@ router.get("/:id", (req: Request, res: Response) => {
     });
 });
 
-// GET /trip/search/fields?id=...&name=...
 router.get("/search/fields", (req: Request, res: Response) => {
-    const id = req.query.id ? Number(req.query.id) : null;
     const name = req.query.name ? String(req.query.name) : "";
-    let sql = "SELECT * FROM trip WHERE ( ? IS NULL OR idx = ? ) OR ( ? = '' OR name LIKE ? )";
-    db.all(sql, [id, id, name, `%${name}%`], (err, rows) => {
+    if (!name.trim()) {
+        
+        return res.json([]);
+    }
+    const sql = "SELECT * FROM trip WHERE name LIKE ?";
+    db.all(sql, [`%${name}%`], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
 // POST /trip/newdata
-router.post("/newdata", (req: Request, res: Response) => {
+router.post("/", (req: Request, res: Response) => {
     const trip: Trip = req.body;
     if (!trip.name || !trip.country) {
         return res.status(400).json({ error: "Missing required fields" });

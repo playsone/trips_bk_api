@@ -1,80 +1,124 @@
-import { Router, Request, Response } from "express";
+import express, { Request, Response } from "express";
 import db from "../db/dbconnect";
 
-export const router = Router();
+export interface Trip {
+    idx:           number;
+    name:          string;
+    country:       string;
+    destinationid: number;
+    coverimage:    string;
+    detail:        string;
+    price:         number;
+    duration:      number;
+}
 
-// TRIP CRUD
+export const router = express.Router();
+
+// GET /trip (all or by id)
 router.get("/", (req: Request, res: Response) => {
-    db.all("SELECT * FROM trip", [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
+    if (req.query.id) {
+        db.get("SELECT * FROM trip WHERE idx = ?", [req.query.id], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!row) return res.status(404).json({ message: "Trip not found" });
+            res.json(row);
+        });
+    } else {
+        db.all("SELECT * FROM trip", [], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    }
 });
 
+// GET /trip/:id
 router.get("/:id", (req: Request, res: Response) => {
-    const id = req.params.id;
+    const id = +req.params.id;
     db.get("SELECT * FROM trip WHERE idx = ?", [id], (err, row) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        if (!row) {
-            res.status(404).json({ error: "Trip not found" });
-            return;
-        }
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(404).json({ message: "Trip not found" });
         res.json(row);
     });
 });
 
-router.post("/", (req: Request, res: Response) => {
-    const { name, country, destinationid, coverimage, detail, price, duration } = req.body;
+// GET /trip/search/fields?id=...&name=...
+router.get("/search/fields", (req: Request, res: Response) => {
+    const id = req.query.id ? Number(req.query.id) : null;
+    const name = req.query.name ? String(req.query.name) : "";
+    let sql = "SELECT * FROM trip WHERE ( ? IS NULL OR idx = ? ) OR ( ? = '' OR name LIKE ? )";
+    db.all(sql, [id, id, name, `%${name}%`], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// POST /trip/newdata
+router.post("/newdata", (req: Request, res: Response) => {
+    const trip: Trip = req.body;
+    if (!trip.name || !trip.country) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+    const sql =
+        "INSERT INTO trip (name, country, destinationid, coverimage, detail, price, duration) VALUES (?, ?, ?, ?, ?, ?, ?)";
     db.run(
-        "INSERT INTO trip (name, country, destinationid, coverimage, detail, price, duration) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [name, country, destinationid, coverimage, detail, price, duration],
+        sql,
+        [
+            trip.name,
+            trip.country,
+            trip.destinationid,
+            trip.coverimage,
+            trip.detail,
+            trip.price,
+            trip.duration,
+        ],
         function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            res.json({ message: "Trip created successfully", id: this.lastID });
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ affected_row: this.changes, last_idx: this.lastID });
         }
     );
 });
 
-router.put("/:id", (req: Request, res: Response) => {
-    const id = req.params.id;
-    const { name, country, destinationid, coverimage, detail, price, duration } = req.body;
-    db.run(
-        "UPDATE trip SET name = ?, country = ?, destinationid = ?, coverimage = ?, detail = ?, price = ?, duration = ? WHERE idx = ?",
-        [name, country, destinationid, coverimage, detail, price, duration, id],
-        function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            if (this.changes === 0) {
-                res.status(404).json({ error: "Trip not found" });
-                return;
-            }
-            res.json({ message: "Trip updated successfully" });
-        }
-    );
-});
-
+// DELETE /trip/:id
 router.delete("/:id", (req: Request, res: Response) => {
-    const id = req.params.id;
+    const id = +req.params.id;
     db.run("DELETE FROM trip WHERE idx = ?", [id], function (err) {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
+        if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) {
-            res.status(404).json({ error: "Trip not found" });
-            return;
+            return res.status(404).json({ message: "Trip not found" });
         }
-        res.json({ message: "Trip deleted successfully" });
+        res.status(200).json({ affected_row: this.changes });
+    });
+});
+
+// PUT /trip/:id
+router.put("/:id", (req: Request, res: Response) => {
+    const id = +req.params.id;
+    const trip: Trip = req.body;
+
+    db.get("SELECT * FROM trip WHERE idx = ?", [id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(404).json({ message: "Trip not found" });
+
+        // Merge original and new data
+        const updateTrip = { ...row, ...trip };
+
+        const sql =
+            "UPDATE trip SET name = ?, country = ?, destinationid = ?, coverimage = ?, detail = ?, price = ?, duration = ? WHERE idx = ?";
+        db.run(
+            sql,
+            [
+                updateTrip.name,
+                updateTrip.country,
+                updateTrip.destinationid,
+                updateTrip.coverimage,
+                updateTrip.detail,
+                updateTrip.price,
+                updateTrip.duration,
+                id,
+            ],
+            function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.status(200).json({ affected_row: this.changes });
+            }
+        );
     });
 });

@@ -85,7 +85,7 @@ router.delete("/destinations/:id", (req, res) => {
 // TRIPS CRUD
 // ------------------------------------------------------------
 // GET /trip - get all trips
-router.get("/trips", (req, res) => {
+router.get("/", (req, res) => {
     const sql = `
     SELECT 
         t.idx, 
@@ -186,7 +186,7 @@ router.put("/:id", (req, res) => {
 });
 
 // Delete a trip
-router.delete("/trips/:id", (req, res) => {
+router.delete("/:id", (req, res) => {
     const id = req.params.id;
     db.run("DELETE FROM trip WHERE idx = ?", [id], function (err) {
         handleResponse(

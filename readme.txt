@@ -1,9 +1,13 @@
 === INSTALL DEPENDENCIES ===
 npm init -y
 npm install express sqlite3
+npm install -D typescript ts-node-dev
+npx tsc --init
+npm install nodemon
+
 
 === RUN ===
-node server.js
+npx nodemon server.ts
 
 
 === Docker ===

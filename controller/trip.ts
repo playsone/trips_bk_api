@@ -18,6 +18,8 @@ export const router = express.Router();
 // DESTINATIONS CRUD
 // ------------------------------------------------------------
 // Get all destinations
+
+
 router.get("/destinations", (req, res) => {
     db.all("SELECT * FROM destination", [], (err, rows) => {
         handleResponse(res, err, rows);
@@ -106,6 +108,38 @@ router.get("/", (req, res) => {
         handleResponse(res, err, rows);
     });
 });
+// GET /trip/countries - ดึงรายชื่อประเทศไม่ซ้ำกัน
+// GET /trip/search/filter?destinationid=xx&country=yyy
+router.get("/search/filter", (req, res) => {
+  const destinationId = Number(req.query.destinationid) || null;
+  const country = req.query.country ? String(req.query.country) : '';
+
+  let sql = `
+    SELECT 
+        t.idx, t.name, t.country, t.coverimage, t.detail, t.price, t.duration,
+        d.zone AS destination_zone
+    FROM trip AS t
+    JOIN destination AS d ON t.destinationid = d.idx
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+
+  if (destinationId) {
+    sql += " AND t.destinationid = ?";
+    params.push(destinationId);
+  }
+
+  if (country.trim()) {
+    sql += " AND t.country LIKE ?";
+    params.push(`%${country}%`);
+  }
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
 
 // GET /trip/search?name=xxx - search trips by name
 router.get("/search/fields", (req: Request, res: Response) => {
@@ -464,6 +498,26 @@ router.delete("/bookings/:id", (req, res) => {
     });
 });
 
+router.get("/search/country", (req, res) => {
+  const country = req.query.country ? String(req.query.country) : "";
+
+  if (!country.trim()) {
+    return res.json([]);
+  }
+
+  // ค้นหาแบบ LIKE เพื่อให้ flexible
+  const sql = "SELECT * FROM trip WHERE country LIKE ?";
+  db.all(sql, [`%${country}%`], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// GET /trip/countries - ดึงรายชื่อประเทศไม่ซ้ำกัน
+
+
+
+
 
 
 // Helper function to handle API responses
@@ -485,3 +539,6 @@ export function handleResponse(
     }
     res.json(data);
 }
+// router.ts
+
+
